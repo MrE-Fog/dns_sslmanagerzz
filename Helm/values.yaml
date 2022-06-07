@@ -1,0 +1,31 @@
+namespace: default
+serviceName: ""
+
+runServer: ""
+
+dataPath: ""
+mountPath: ""
+
+cronSchedule: "45 */12 * * *"
+
+replicaCount: 1
+
+image:
+  repository: ""
+  name: ""
+  tag: ""
+  pullPolicy: Always
+  # Overrides the image tag whose default is the chart appVersion.
+
+imagePullSecrets: {}
+nameOverride: ""
+fullnameOverride: ""
+
+resources: {}
+
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 100
+  targetCPUUtilizationPercentage: 80
+  # targetMemoryUtilizationPercentage: 80

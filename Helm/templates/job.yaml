@@ -1,0 +1,29 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: job-{{ .Values.serviceName }}
+  namespace: {{ .Values.namespace }}
+spec:
+  template:
+    spec:
+      nodeName: {{ .Values.runServer }}
+      containers:
+      - name: job-{{ .Values.serviceName }}
+        image: "{{ .Values.image.repository }}/{{ .Values.image.name }}:{{ .Values.image.tag }}"
+        imagePullPolicy: Always
+        envFrom:
+        - secretRef:
+            name: dbconfig
+        - secretRef:
+            name: dnsconfig
+        - secretRef:
+            name: sslconfig
+        volumeMounts:
+          - name: {{ .Values.serviceName }}-data
+            mountPath: {{ .Values.mountPath }}
+      volumes:
+        - name: {{ .Values.serviceName }}-data
+          persistentVolumeClaim:
+            claimName: {{ .Values.serviceName }}-pvc
+      restartPolicy: Never
+  backoffLimit: 4

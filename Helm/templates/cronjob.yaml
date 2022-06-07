@@ -1,0 +1,33 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: cron-{{  .Values.serviceName }}
+  namespace: {{  .Values.namespace }}
+spec:
+  schedule: {{  .Values.cronSchedule }}
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          restartPolicy: OnFailure
+          nodeName: {{ .Values.runServer }}
+          containers:
+          - name: cron-{{ .Values.serviceName }}
+            image: "{{  .Values.image.repository }}/{{  .Values.image.name }}:{{ .Values.image.tag }}"
+            imagePullPolicy: Always
+            envFrom:
+            - secretRef:
+                name: dbconfig
+            - secretRef:
+                name: dnsconfig
+            - secretRef:
+                name: sslconfig
+            volumeMounts:
+              - name: {{ .Values.serviceName }}-data
+                mountPath: {{ .Values.mountPath }}
+          volumes:
+            - name: {{ .Values.serviceName }}-data
+              persistentVolumeClaim:
+                claimName: {{ .Values.serviceName }}-pvc
+---
