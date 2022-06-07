@@ -1,0 +1,290 @@
+#!/usr/bin/perl
+################################################################################
+# Needed environment variables
+# PDNS_Url = The API endpoint of the dns server
+# PDNS_ServerId = The 'name' of your dns server
+# PDNS_Token = The API token for your dns server
+################################################################################
+# use DateTime;
+use JSON;           # libjson-perl
+use Data::Dumper;
+use Date::Parse;    # libdatetime-format-dateparse-perl
+use Try::Tiny;
+use Net::Nslookup;  # libnet-nslookup-perl
+use Getopt::Long;
+use DBI;            # libdbi-perl libdbd-mysql-perl
+################################################################################
+GetOptions ("domain=s" => \$domain,
+            "exclude=s" => \@exclude,
+            "staging"   => \$staging,
+            "verbose"   => \$verbose,
+            "force"   => \$force,
+            "debug"   => \$debug,
+            "dryrun"  => \$dryrun,
+			"list"    => \$list)
+or die("Error in command line arguments\n");
+################################################################################
+$verbose = 1; # Do a LOT of logging
+# $dryrun = 1;    # Don't actually do anything
+$staging = 1;   # Use the 'staging' server, don't generate live certs
+################################################################################
+my $curl    = `which curl`;     chomp $curl;    if (!$curl) { die "Unable to locate 'curl'\n"; }
+my $grep    = `which grep`;     chomp $grep;    if (!$grep) { die "Unable to locate 'grep'\n"; }
+my $shaSum  = `which sha1sum`;  chomp $shaSum;  if (!$shaSum) { die "Unable to locate 'sha1sum'\n"; }
+my $openssl = `which openssl`;  chomp $openssl; if (!$openssl) { die "Unable to locate 'openssl'\n"; }
+my $acme = "/root/.acme.sh/acme.sh";
+if (!-e "/root/.acme.sh/acme.sh") { die "Unable to locate 'acme.sh'\n"; }
+################################################################################
+# Read configuration files
+opendir (DIR, "/config");
+my @configFiles = readdir(DIR);
+closedir (DIR);
+foreach (@configFiles)
+{
+    my $configKey = $_;
+    open(IN, "/config/" . $configKey);
+    my $configValue = <IN>;
+    close (IN);
+    chomp $configValue;
+    $config->{$configKey} = $configValue;
+}
+################################################################################
+$keyAgeTrigger = 86400 * 7;
+$destFolder = $ENV{'destFolder'};
+################################################################################
+&dbInit;
+&sqlInit;
+################################################################################
+undef(@domainList);
+if ($listDomains->execute())
+{
+	if ($list)
+	{
+		&writeLog("Domain List:\n");
+	}
+	while (my ($domainName) = $listDomains->fetchrow_array())
+	{
+		if ($list)
+		{
+			&writeLog("\t$domainName\n");
+		}
+		else
+		{
+			push(@domainList, $domainName);
+			########
+			my $pemFile = $destFolder . "/" . $domainName . ".pem";
+			########
+			if (-e $pemFile)
+			{
+				my $expireDate = `$openssl x509 -enddate -noout -in  $pemFile`; chomp $expireDate;
+		        my ($jnk,$expireDate) = split("=", $expireDate);
+				#####
+		        my $expireEpoch = str2time($expireDate);
+				my $expireRemain = $expireEpoch - time();
+		        #####
+				# print "FILE :: $pemFile :: $expireDate :: $expireEpoch :: $expireRemain\n";
+		        if (($expireRemain < $keyAgeTrigger) || ($force))
+				{
+					my $pemDomain = substr($pemFile, 13);
+		            $pemDomain = substr($pemDomain, 0, length($pemDomain)-4);
+					$expiredDomain->{$pemDomain} = 1;
+                    &writeLog("\tNeed To Renew :: $pemFile :: $pemDomain ($domainName)\n");
+				}
+			}
+			else
+			{
+				$expiredDomain->{$domainName} = 1;
+			}
+        }
+	}
+}
+################################################################################
+if ($list)
+{
+	exit;
+}
+################################################################################
+if ($domain)
+{
+    foreach (@domainList)
+    {
+    	my $priDomain = $_;
+        if ($priDomain ne $domain)
+        {
+            $bannedSite->{$priDomain} = 1;
+            ###
+            &writeLog("Not processing :: $priDomain ($domain)\n");
+        }
+    }
+}
+################################################################################
+foreach (@domainList)
+{
+    my $missingCount = 0;
+    my $priDomain = $_;
+    if (!$bannedSite->{$priDomain})
+    {
+        my $pemFile = $priDomain . ".pem";
+        ##########
+        $certList = "-d $priDomain -d *.$priDomain";
+        ##########
+        if ($expiredDomain->{$priDomain})
+        {
+            &writeLog("$priDomain needs to be renewed :: $certList");
+            &createCert($certList, $priDomain, $destFolder . "/$pemFile");
+        }
+        elsif (-e $destFolder . "/$pemFile")
+        {
+            if ($missingCount)
+            {
+                &writeLog("$priDomain is missing $missingCount hosts, creating new cert");
+                &createCert($certList, $priDomain, $destFolder . "/$pemFile");
+            }
+            else
+            {
+                # print "GOOD\n";
+            }
+        }
+        else
+        {
+            &writeLog("Creating $priDomain :: missing PEM file ($destFolder/$pemFile)");
+            &createCert($certList, $priDomain, $destFolder . "/$pemFile");
+        }
+    }
+	else
+	{
+		# print "Skipping banned domain :: $priDomain\n";
+	}
+}
+################################################################################
+################################################################################
+sub createCert
+{
+    my ($domainList, $parentDMN, $pemFile) = @_;
+    ##########
+	# print "\tCREATE :: $domainList :: $parentDMN :: $pemFile\n";
+	##########
+    if ($domainList)
+    {
+        &writeLog("Creating certificate for $parentDMN");
+        ##########
+		if ($force)
+		{
+			system ("rm -rf /root/acme.sh/data/SSL/$parentDMN")
+		}
+		##########
+        system ("mkdir -p /root/acme.sh/data/SSL/$parentDMN");
+        my $certFile  = "--cert-file /root/acme.sh/data/SSL/" . $parentDMN . "/" . $parentDMN . ".cer";
+        my $keyFile   = "--key-file /root/acme.sh/data/SSL/" . $parentDMN . "/" . $parentDMN . ".key";
+        my $caFile    = "--ca-file /root/acme.sh/data/SSL/" . $parentDMN . "/ca.cer";
+        my $chainFile = "--fullchain-file /root/acme.sh/data/SSL/" . $parentDMN . "/fullchain.cer";
+        ##########
+        $renewCmd =  "export LE_WORKING_DIR=\"/root/.acme.sh\";";
+        $renewCmd .= "export LE_CONFIG_HOME=\"/root/acme.sh/data\"; ";
+        $renewCmd .= "export PDNS_Url=\"" . $ENV{'PDNS_Url'}. "\"; ";
+        $renewCmd .= "export PDNS_ServerId=\"" . $ENV{'PDNS_ServerId'}. "\"; ";
+        $renewCmd .= "export PDNS_Token=\"" . $ENV{'PDNS_Token'}. "\"; ";
+        $renewCmd .= "export PDNS_Ttl=60; ";
+        $renewCmd .= "$acme --home /root/.acme.sh/ --issue $domainList --dns dns_pdns $certFile $keyFile $caFile $chainFile";
+        if ($force)   { $renewCmd .= " --force";}
+        if ($staging) { $renewCmd .= " --staging";}
+        if ($verbose) { $renewCmd .= " --log-level 2 --debug --log";}
+        ##########
+        if ($dryrun)
+        {
+            print "\t CMD :: $renewCmd\n";
+        }
+        else
+        {
+            #######
+            my $curAttempt = 0;
+            my $maxAttempt = 5;
+            my $goodCreate = 0;
+            while ($curAttempt < $maxAttempt)
+            {
+                $curAttempt ++;
+    			#####
+                # print "RENEW CMD :: $renewCmd :: $curAttempt\n";
+                #####
+                my $exitCode = system("$renewCmd 1>/tmp/create_$parentDMN 2>/tmp/error_$parentDMN");
+                &writeLog("\tAttempt: $curAttempt :: $exitCode");
+                if ($exitCode == 0) { $curAttempt = 99; $goodCreate = 1; }
+                $curAttempt = 99;
+            }
+			#######
+            if ($goodCreate)
+            {
+                $genPemCMD = "";
+#                if (-e "/root/.acme/$parentDMN")
+#                {
+#                    $genPemCMD = "/bin/cat /root/.acme.sh/$parentDMN/fullchain.cer /root/.acme.sh/$parentDMN/$parentDMN.key | /usr/bin/tee $pemFile 1>/dev/null 2>/dev/null";
+#                }
+#                elsif (-e "/root/.acme/www.$parentDMN")
+#                {
+#                    $genPemCMD = "/bin/cat /root/.acme.sh/www.$parentDMN/fullchain.cer /root/.acme.sh/www.$parentDMN/www.$parentDMN.key | /usr/bin/tee $pemFile 1>/dev/null 2>/dev/null";
+#                }
+                if (-e "/root/acme.sh/data/SSL/$parentDMN")
+                {
+                    $genPemCMD = "/bin/cat /root/acme.sh/data/SSL/$parentDMN/fullchain.cer /root/acme.sh/data/SSL/$parentDMN/$parentDMN.key | /usr/bin/tee $pemFile 1>/dev/null 2>/dev/null";
+                }
+#                elsif (-e "/root/acme.sh/data/www.$parentDMN")
+#                {
+#                    $genPemCMD = "/bin/cat /root/acme.sh/data/www.$parentDMN/fullchain.cer /root/acme.sh/data/www.$parentDMN/www.$parentDMN.key | /usr/bin/tee $pemFile 1>/dev/null 2>/dev/null";
+#                }
+                elsif (-e $destFolder . "/$parentDMN")
+                {
+                    $genPemCMD = "/bin/cat $destFolder/$parentDMN/fullchain.cer $destFolder/$parentDMN/$parentDMN.key | /usr/bin/tee $pemFile 1>/dev/null 2>/dev/null";
+                }
+                # print "GenPEM :: $genPemCMD\n";
+                `$genPemCMD`;
+                ##########
+                $certCreated ++;
+                ##########
+                print "\tCompleted new CRT/PEM generation for $parentDMN\n";
+            }
+            else
+            {
+                print "\tCRT Create Failed for $parentDMN\n";
+    			print "\t\tCommand used: $renewCmd\n";
+                exit;
+            }
+        }
+    }
+    else
+    {
+        print "\t** $parentDMN has no valid entries to create for **\n";
+    }
+}
+################################################################################
+################################################################################
+sub writeLog
+{
+    my ($line) = @_;
+    chomp $line;
+    print $line . "\n";
+}
+################################################################################
+sub sqlInit
+{
+	my $listDomains_SQL = "SELECT name FROM pdns.domains WHERE name NOT LIKE '%addr.arpa' AND skipSSL = 0 ORDER BY name";
+	if (!($listDomains = $dbh->prepare($listDomains_SQL)))
+	{
+		print "Unable to prepare :: $listDomains_SQL\n";
+		exit;
+	}
+}
+################################################################################
+sub dbInit
+{
+	$database_port = "3306";
+	#########################
+    $database_srvr = $config->{'dbServer'};
+    $database_user = $config->{'dbUser'};
+    $database_pass = $config->{'dbPass'};
+    ##########################
+	my $driver = "mysql";
+	#####
+	my $dsn = "DBI:$driver:database=$database:host=$database_srvr;port=$database_port";
+	#####
+	if (!($dbh = DBI->connect($dsn, $database_user, $database_pass,{PrintError => 1,RaiseError => 1,AutoCommit => 1,ShowErrorStatement=>1}))) {print "Error connecting to $database_srvr.\n"; exit; };
+}
