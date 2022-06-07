@@ -1,18 +1,17 @@
 #!/bin/bash
 
-# Forgot, pipeline doesn't like installing some stuff, installing here
-# *** Commenting out as testing is no longer active ***
-apt update
-apt install -y openssh-server
+export LE_WORKING_DIR="/root/.acme.sh"
+export LE_CONFIG_HOME="/root/acme.sh/data"
+export PDNS_Ttl=60
 
 cd /opt/acme/acme.sh
 # Using --force so it'll install without cron being installed
 echo $sslUser
 ./acme.sh --install --force -m $sslUser
+/root/.acme.sh/acme.sh --register-account -m $sslUser;
 
-time /opt/sslManager -verbose -debug
+# Do the cert check/renewal, output goes to STDOUT
+/opt/sslManager -verbose -debug
 
-# *** Commenting out as testing is no longer active ***
-# Start SSH after script exits to allow system access
-mkdir /run/sshd
-/usr/sbin/sshd -D
+# Sleep for 6 hours after completion to allow for system access
+/bin/sleep 21600

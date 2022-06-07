@@ -100,10 +100,6 @@ if ($list)
 	exit;
 }
 ################################################################################
-# Make sure the ZeroSSL account is valid
-&writeLog("Registering/updating ZeroSSL account");
-`$acme --register-account -m "$ENV{'sslUser'}'"`;
-################################################################################
 if ($domain)
 {
     foreach (@domainList)
@@ -185,13 +181,13 @@ sub createCert
         my $caFile    = "--ca-file /root/acme.sh/data/SSL/" . $parentDMN . "/ca.cer";
         my $chainFile = "--fullchain-file /root/acme.sh/data/SSL/" . $parentDMN . "/fullchain.cer";
         ##########
-        $renewCmd =  "export LE_WORKING_DIR=\"/root/.acme.sh\";";
-        $renewCmd .= "export LE_CONFIG_HOME=\"/root/acme.sh/data\"; ";
-        $renewCmd .= "export PDNS_Url=\"" . $ENV{'PDNS_Url'}. "\"; ";
-        $renewCmd .= "export PDNS_ServerId=\"" . $ENV{'PDNS_ServerId'}. "\"; ";
-        $renewCmd .= "export PDNS_Token=\"" . $ENV{'PDNS_Token'}. "\"; ";
-        $renewCmd .= "export PDNS_Ttl=60; ";
-        $renewCmd .= "$acme --home /root/.acme.sh/ --issue $domainList --dns dns_pdns $certFile $keyFile $caFile $chainFile";
+        # $renewCmd =  "export LE_WORKING_DIR=\"/root/.acme.sh\";";
+        # $renewCmd .= "export LE_CONFIG_HOME=\"/root/acme.sh/data\"; ";
+        # $renewCmd .= "export PDNS_Url=\"" . $ENV{'PDNS_Url'}. "\"; ";
+        # $renewCmd .= "export PDNS_ServerId=\"" . $ENV{'PDNS_ServerId'}. "\"; ";
+        # $renewCmd .= "export PDNS_Token=\"" . $ENV{'PDNS_Token'}. "\"; ";
+        # $renewCmd .= "export PDNS_Ttl=60; ";
+        $renewCmd = "$acme --home /root/.acme.sh/ --issue $domainList --dns dns_pdns $certFile $keyFile $caFile $chainFile";
         if ($force)   { $renewCmd .= " --force";}
         if ($staging) { $renewCmd .= " --staging";}
         if ($verbose) { $renewCmd .= " --log-level 2 --debug --log";}
@@ -202,6 +198,7 @@ sub createCert
         }
         else
         {
+            writeLog("Starting renew with :: $renewCmd");
             #######
             my $curAttempt = 0;
             my $maxAttempt = 5;
