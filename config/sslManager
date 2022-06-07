@@ -24,9 +24,14 @@ GetOptions ("domain=s" => \$domain,
 			"list"    => \$list)
 or die("Error in command line arguments\n");
 ################################################################################
-$verbose = 1; # Do a LOT of logging
-# $dryrun = 1;    # Don't actually do anything
-$staging = 1;   # Use the 'staging' server, don't generate live certs
+# $verbose = 1;     # Do a LOT of logging
+# $dryrun = 1;      # Don't actually do anything
+# $staging = 1;     # Use the 'staging' server, don't generate live certs
+################################################################################
+if ($staging)   { print ":: Running in STAGING mode\n"; }
+if ($verbose)   { print ":: Running in VERBOSE mode\n"; }
+if ($force)     { print ":: Running in FORCE mode\n"; }
+if ($dryrun)    { print ":: Running in DRYRUN mode\n"; }
 ################################################################################
 my $curl    = `which curl`;     chomp $curl;    if (!$curl) { die "Unable to locate 'curl'\n"; }
 my $grep    = `which grep`;     chomp $grep;    if (!$grep) { die "Unable to locate 'grep'\n"; }
@@ -143,7 +148,10 @@ foreach (@domainList)
 		# print "Skipping banned domain :: $priDomain\n";
 	}
 }
-&writeLog("$certCreated cert(s) created.");
+if ($certCreated)
+{
+    &writeLog("$certCreated cert(s) created.");
+}
 ################################################################################
 ################################################################################
 ################################################################################
