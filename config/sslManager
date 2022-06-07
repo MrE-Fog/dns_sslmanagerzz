@@ -101,6 +101,7 @@ if ($list)
 }
 ################################################################################
 # Make sure the ZeroSSL account is valid
+&writeLog("Registering/updating ZeroSSL account");
 `$acme --register-account -m "$ENV{'sslUser'}'"`;
 ################################################################################
 if ($domain)
