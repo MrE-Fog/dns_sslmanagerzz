@@ -13,5 +13,5 @@ echo $sslUser
 # Do the cert check/renewal, output goes to STDOUT
 /opt/sslManager -verbose -debug
 
-# Sleep for 6 hours after completion to allow for system access
-/bin/sleep 21600
+# Sleep for 2 hours after completion to allow for system access
+/bin/sleep 7200

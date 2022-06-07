@@ -124,6 +124,7 @@ foreach (@domainList)
         ##########
         $certList = "-d $priDomain -d *.$priDomain";
         ##########
+        &writeLog("===========================================================");
         if ($expiredDomain->{$priDomain})
         {
             &writeLog("$priDomain needs to be renewed :: $certList");
