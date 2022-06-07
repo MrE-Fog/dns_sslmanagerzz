@@ -14,4 +14,4 @@ echo $sslUser
 # mkdir /run/sshd
 # /usr/sbin/sshd -D
 
-time /opt/sslManager -verbose
+time /opt/sslManager -verbose -debug
