@@ -14,4 +14,5 @@ echo $sslUser
 /opt/sslManager -verbose -debug
 
 # Sleep for 2 hours after completion to allow for system access
+echo "Sleeping for 2 hours for triage"
 /bin/sleep 7200
