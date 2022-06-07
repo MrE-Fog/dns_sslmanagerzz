@@ -2,7 +2,7 @@ FROM debian:11
 ################################################################################
 RUN apt update && \
     apt upgrade && \
-    apt -y install passwd lsb-release curl libjson-perl libdatetime-format-dateparse-perl libnet-nslookup-perl libdbi-perl libdbd-mysql-perl git && \
+    apt -y install passwd lsb-release curl libjson-perl libdatetime-format-dateparse-perl libnet-nslookup-perl libdbi-perl libdbd-mysql-perl git procps psmisc && \
     /bin/rm -f /etc/localtime && \
     /bin/cp /usr/share/zoneinfo/America/New_York /etc/localtime && \
     mkdir /opt/acme && \
