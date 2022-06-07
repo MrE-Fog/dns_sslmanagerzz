@@ -100,6 +100,9 @@ if ($list)
 	exit;
 }
 ################################################################################
+# Make sure the ZeroSSL account is valid
+`$acme --register-account -m "$ENV{'sslUser'}'"`;
+################################################################################
 if ($domain)
 {
     foreach (@domainList)
@@ -187,7 +190,6 @@ sub createCert
         $renewCmd .= "export PDNS_ServerId=\"" . $ENV{'PDNS_ServerId'}. "\"; ";
         $renewCmd .= "export PDNS_Token=\"" . $ENV{'PDNS_Token'}. "\"; ";
         $renewCmd .= "export PDNS_Ttl=60; ";
-        $renewCmd .= "$acme --register-account -m '" . $ENV{'sslUser'} . "'; ";
         $renewCmd .= "$acme --home /root/.acme.sh/ --issue $domainList --dns dns_pdns $certFile $keyFile $caFile $chainFile";
         if ($force)   { $renewCmd .= " --force";}
         if ($staging) { $renewCmd .= " --staging";}
