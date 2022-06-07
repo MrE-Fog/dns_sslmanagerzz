@@ -5,7 +5,6 @@ workflows:
     jobs:
       - build:
           context:
-            - zDNS
             - DockerLogin
 
 jobs:
@@ -52,5 +51,3 @@ jobs:
             ##
             docker push ${IMAGE_REPO}/${IMAGE_NAME}:$TS
             docker push ${IMAGE_REPO}/${IMAGE_NAME}:latest
-            ##
-            helm upgrade ${SERVICE_NAME} Helm/ --set serviceName="${SERVICE_NAME}",namespace="${SERVICE_NAMESPACE}",image.repository="${IMAGE_REPO}",image.name="${IMAGE_NAME}",image.tag=$TS

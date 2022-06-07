@@ -35,20 +35,7 @@ my $openssl = `which openssl`;  chomp $openssl; if (!$openssl) { die "Unable to 
 my $acme = "/root/.acme.sh/acme.sh";
 if (!-e "/root/.acme.sh/acme.sh") { die "Unable to locate 'acme.sh'\n"; }
 ################################################################################
-# Read configuration files
-opendir (DIR, "/config");
-my @configFiles = readdir(DIR);
-closedir (DIR);
-foreach (@configFiles)
-{
-    my $configKey = $_;
-    open(IN, "/config/" . $configKey);
-    my $configValue = <IN>;
-    close (IN);
-    chomp $configValue;
-    $config->{$configKey} = $configValue;
-}
-################################################################################
+# Generate new cert when existing cert has less than 'X' days left before expiring
 $keyAgeTrigger = 86400 * 7;
 $destFolder = $ENV{'destFolder'};
 ################################################################################
@@ -156,6 +143,9 @@ foreach (@domainList)
 		# print "Skipping banned domain :: $priDomain\n";
 	}
 }
+&writeLog("$certCreated cert(s) created.");
+################################################################################
+################################################################################
 ################################################################################
 ################################################################################
 sub createCert
@@ -215,22 +205,10 @@ sub createCert
             if ($goodCreate)
             {
                 $genPemCMD = "";
-#                if (-e "/root/.acme/$parentDMN")
-#                {
-#                    $genPemCMD = "/bin/cat /root/.acme.sh/$parentDMN/fullchain.cer /root/.acme.sh/$parentDMN/$parentDMN.key | /usr/bin/tee $pemFile 1>/dev/null 2>/dev/null";
-#                }
-#                elsif (-e "/root/.acme/www.$parentDMN")
-#                {
-#                    $genPemCMD = "/bin/cat /root/.acme.sh/www.$parentDMN/fullchain.cer /root/.acme.sh/www.$parentDMN/www.$parentDMN.key | /usr/bin/tee $pemFile 1>/dev/null 2>/dev/null";
-#                }
                 if (-e "/root/acme.sh/data/SSL/$parentDMN")
                 {
                     $genPemCMD = "/bin/cat /root/acme.sh/data/SSL/$parentDMN/fullchain.cer /root/acme.sh/data/SSL/$parentDMN/$parentDMN.key | /usr/bin/tee $pemFile 1>/dev/null 2>/dev/null";
                 }
-#                elsif (-e "/root/acme.sh/data/www.$parentDMN")
-#                {
-#                    $genPemCMD = "/bin/cat /root/acme.sh/data/www.$parentDMN/fullchain.cer /root/acme.sh/data/www.$parentDMN/www.$parentDMN.key | /usr/bin/tee $pemFile 1>/dev/null 2>/dev/null";
-#                }
                 elsif (-e $destFolder . "/$parentDMN")
                 {
                     $genPemCMD = "/bin/cat $destFolder/$parentDMN/fullchain.cer $destFolder/$parentDMN/$parentDMN.key | /usr/bin/tee $pemFile 1>/dev/null 2>/dev/null";
@@ -278,9 +256,9 @@ sub dbInit
 {
 	$database_port = "3306";
 	#########################
-    $database_srvr = $config->{'dbServer'};
-    $database_user = $config->{'dbUser'};
-    $database_pass = $config->{'dbPass'};
+    $database_srvr = $ENV{'dbServer'};
+    $database_user = $ENV{'dbUser'};
+    $database_pass = $ENV{'dbPass'};
     ##########################
 	my $driver = "mysql";
 	#####
