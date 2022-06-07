@@ -82,6 +82,10 @@ if ($listDomains->execute())
 					$expiredDomain->{$pemDomain} = 1;
                     &writeLog("\tNeed To Renew :: $pemFile :: $pemDomain ($domainName)\n");
 				}
+                elsif ($expireRemain > $keyAgeTrigger)
+                {
+                    &writeLog("\tPEM for $domainName does not need renewal");
+                }
 			}
 			else
 			{
@@ -183,6 +187,7 @@ sub createCert
         $renewCmd .= "export PDNS_ServerId=\"" . $ENV{'PDNS_ServerId'}. "\"; ";
         $renewCmd .= "export PDNS_Token=\"" . $ENV{'PDNS_Token'}. "\"; ";
         $renewCmd .= "export PDNS_Ttl=60; ";
+        $renewCmd .= "$acme --register-account -m '" . $ENV{'sslUser'} . "'; ";
         $renewCmd .= "$acme --home /root/.acme.sh/ --issue $domainList --dns dns_pdns $certFile $keyFile $caFile $chainFile";
         if ($force)   { $renewCmd .= " --force";}
         if ($staging) { $renewCmd .= " --staging";}
