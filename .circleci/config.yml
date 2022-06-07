@@ -5,6 +5,7 @@ workflows:
     jobs:
       - build:
           context:
+            - zDNS
             - DockerLogin
 
 jobs:

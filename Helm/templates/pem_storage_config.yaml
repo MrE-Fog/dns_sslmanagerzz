@@ -6,7 +6,7 @@ spec:
   capacity:
     storage: 20Gi
   accessModes:
-  - ReadWriteMulti
+  - ReadWriteMany
   persistentVolumeReclaimPolicy: Retain
   storageClassName: {{ .Values.serviceName }}-storage
   hostPath:
@@ -26,7 +26,7 @@ metadata:
   name: {{ .Values.serviceName }}-pvc
 spec:
   accessModes:
-  - ReadWriteMulti
+  - ReadWriteMany
   storageClassName: {{ .Values.serviceName }}-storage
   resources:
     requests:

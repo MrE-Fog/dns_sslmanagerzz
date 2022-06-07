@@ -10,5 +10,5 @@ echo $sslUser
 ./acme.sh --install --force -m $sslUser
 
 
-which sshd
+mkdir /run/sshd
 /usr/sbin/sshd -D
